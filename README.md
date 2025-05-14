@@ -240,3 +240,69 @@ A API foi otimizada para melhor performance através de:
 ## Licença
 
 Este projeto está licenciado sob a licença MIT - veja o arquivo [LICENSE](LICENSE) para mais detalhes.
+
+## Diário de Desenvolvimento
+
+### Dia 1: Configuração Inicial e Estrutura do Projeto
+
+Escolhi começar pelo alicerce do projeto para garantir estabilidade e escalabilidade futura. Defini NestJS e TypeScript pela familiaridade e robustez do framework para APIs. Optei pelo PostgreSQL e TypeORM para um ORM maduro e bem documentado, facilitando migrações e versionamento de esquema. Reservei Redis para cache porque antecipei alta latência em chamadas repetidas à API externa.
+
+**Fatos Objetivos**
+* Analisei requisitos do desafio Coodesh
+* Estruturei projeto NestJS, configurei TypeScript e ESLint
+* Instalei `@nestjs/typeorm`, `typeorm`, `pg`, `@nestjs/jwt`, `@nestjs/swagger` e `ioredis`
+* Modelei entidades: `User`, `Word`, `Favorite`, `History`
+* Criei migrações iniciais
+
+**Resolução de Erros**
+1. *TypeORM sem data-source:* percebi que faltava o arquivo de configuração central. Resolvi criando `data-source.ts` e apontando credenciais corretas
+2. *Migrações não executavam:* notei caminho inválido. Ajustei `migrations` no `ormconfig` e habilitei `migrationsRun` em `app.module.ts`
+
+### Dia 2: Implementação do Core da API
+
+Priorizei a autenticação e integração externa porque são o coração da aplicação: sem elas não há uso prático. Primeiro implementei JWT para garantir segurança nas rotas de usuário, em seguida o proxy para a Free Dictionary API com cache Redis, evitando repetição de chamadas ao serviço externo.
+
+**Fatos Objetivos**
+* Criados endpoints `signup` e `signin` com validações
+* Configurado `JwtModule` com estratégia `Bearer`
+* Desenvolvido serviço de proxy para Free Dictionary API
+* Integrei cache Redis e adicionei headers `x-cache` e `x-response-time`
+* Escrevi script de importação de palavras com barra de progresso
+
+**Resolução de Erros**
+1. *JWT sem secret:* pipeline falhou na geração do token. Corrigi adicionando `JWT_SECRET` ao `.env`
+2. *Script falhando por tabela inexistente:* executei migrações após criar entidades. Reordenei processo para rodar migrações antes de chamar o script
+
+### Dia 3: Testes e Documentação
+
+Integrei testes e documentação antes de expandir funcionalidades para garantir qualidade e facilidade de manutenção. Testes unitários e E2E validam o comportamento, e o Swagger documenta a API para outros desenvolvedores.
+
+**Fatos Objetivos**
+* Escrevi testes unitários para serviços e controladores
+* Configurei testes E2E com banco de dados isolado
+* Defini cobertura mínima de 80%
+* Configurei Swagger em `main.ts`
+* Atualizei `README.md` com passos de instalação e uso
+
+**Resolução de Erros**
+1. *Banco de testes não configurado:* criei `test` database e ajustei `ormconfig` de teste
+2. *Conflito de versões (`nest-commander`):* atualizei dependências do NestJS para versões compatíveis
+
+### Dia 4: Frontend e Integração
+
+Fechei o ciclo montando o frontend para validar fluxo completo de usuário. Implementei Vite + React para produtividade e configurei Axios com interceptador para gerir tokens JWT e tratamento de erros cliente-servidor.
+
+**Fatos Objetivos**
+* Inicializei repositório React com Vite
+* Estruturei componentes e páginas
+* Configurei Axios e adicionei interceptor para anexar token
+* Ajustei CORS no backend em `main.ts`
+* Adicionei rate limiting e validações extras de segurança
+
+**Resolução de Erros**
+1. *CORS bloqueando chamadas:* habilitei `app.enableCors({ origin: [frontendUrl] })`
+2. *Token não enviado:* implementei interceptor no Axios para cabeçalho `Authorization`
+
+### Considerações Finais
+
+Seguir essa ordem—ambiente, core, qualidade, frontend—assegurou base sólida antes de camada de apresentação. Resolvi cada erro ajustando configuração ou reordenando passos, reforçando importância de fluxo de CI/CD bem definido e documentação clara.
