@@ -19,9 +19,11 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "typeorm": "ts-node ./node_modules/typeorm/cli",
-    "migration:generate": "npm run typeorm -- migration:generate -d src/config/database/typeorm.config.ts",
-    "migration:run": "npm run typeorm -- migration:run -d src/config/database/typeorm.config.ts",
-    "migration:revert": "npm run typeorm -- migration:revert -d src/config/database/typeorm.config.ts"
+    "migration:generate": "npm run typeorm -- migration:generate --dataSource src/config/database/typeorm.config.ts",
+    "migration:run": "npm run typeorm -- migration:run --dataSource src/config/database/typeorm.config.ts",
+    "migration:revert": "npm run typeorm -- migration:revert --dataSource src/config/database/typeorm.config.ts",
+    "migration:show": "npm run typeorm -- migration:show --dataSource src/config/database/typeorm.config.ts",
+    "import-words": "ts-node src/scripts/import-words.ts"
   },
   "dependencies": {
     "@nestjs-modules/ioredis": "^2.0.2",
