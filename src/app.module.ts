@@ -8,8 +8,8 @@ import databaseConfig from './config/database.config';
 import jwtConfig from './config/jwt.config';
 import dictionaryConfig from './config/dictionary.config';
 import { UsersModule } from './modules/users/users.module';
-import { CommandsModule } from './commands/commands.module';
-import { Word } from './modules/words/entities/word.entity';
+import { AuthModule } from './modules/auth/auth.module';
+import { WordsModule } from './modules/words/words.module';
 
 @Module({
   imports: [
@@ -37,7 +37,8 @@ import { Word } from './modules/words/entities/word.entity';
     }),
     TypeOrmModule.forFeature([Word]),
     UsersModule,
-    CommandsModule,
+    AuthModule,
+    WordsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

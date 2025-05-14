@@ -22,12 +22,12 @@ async function bootstrap() {
   // Configuração do Swagger
   const config = new DocumentBuilder()
     .setTitle('Dictionary API')
-    .setDescription('API para consulta de dicionário')
+    .setDescription('API para consulta de dicionário com autenticação e histórico')
     .setVersion('1.0')
     .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document);
+  SwaggerModule.setup('api', app, document);
 
   await app.listen(process.env.PORT || 3000);
 }

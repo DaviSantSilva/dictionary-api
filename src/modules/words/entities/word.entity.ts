@@ -1,12 +1,19 @@
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { ApiProperty } from '@nestjs/swagger';
 
 @Entity('words')
 export class Word {
   @PrimaryGeneratedColumn('uuid')
+  @ApiProperty({ description: 'Unique identifier' })
   id: string;
 
-  @Column({ unique: true })
+  @Column()
+  @ApiProperty({ description: 'The word itself' })
   word: string;
+
+  @Column('jsonb')
+  @ApiProperty({ description: 'Word details from dictionary API' })
+  details: any;
 
   @Column('text')
   definition: string;
@@ -30,8 +37,10 @@ export class Word {
   searchCount: number;
 
   @CreateDateColumn()
+  @ApiProperty({ description: 'Creation timestamp' })
   createdAt: Date;
 
   @UpdateDateColumn()
+  @ApiProperty({ description: 'Last update timestamp' })
   updatedAt: Date;
 }
