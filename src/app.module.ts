@@ -8,6 +8,8 @@ import databaseConfig from './config/database.config';
 import jwtConfig from './config/jwt.config';
 import dictionaryConfig from './config/dictionary.config';
 import { UsersModule } from './modules/users/users.module';
+import { CommandsModule } from './commands/commands.module';
+import { Word } from './modules/words/entities/word.entity';
 
 @Module({
   imports: [
@@ -26,12 +28,16 @@ import { UsersModule } from './modules/users/users.module';
         username: configService.get('database.username'),
         password: configService.get('database.password'),
         database: configService.get('database.name'),
-        entities: [__dirname + '/**/*.entity{.ts,.js}'],
-        synchronize: configService.get('database.synchronize'),
+        entities: [__dirname + '/../**/*.entity{.ts,.js}'],
+        synchronize: false,
+        logging: true,
+        schema: 'public',
       }),
       inject: [ConfigService],
     }),
+    TypeOrmModule.forFeature([Word]),
     UsersModule,
+    CommandsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
