@@ -74,6 +74,8 @@ describe('WordsService', () => {
           provide: getRepositoryToken(History),
           useValue: {
             createQueryBuilder: jest.fn().mockReturnThis(),
+            select: jest.fn().mockReturnThis(),
+            leftJoin: jest.fn().mockReturnThis(),
             where: jest.fn().mockReturnThis(),
             andWhere: jest.fn().mockReturnThis(),
             orderBy: jest.fn().mockReturnThis(),
@@ -88,6 +90,8 @@ describe('WordsService', () => {
           provide: getRepositoryToken(Favorite),
           useValue: {
             createQueryBuilder: jest.fn().mockReturnThis(),
+            select: jest.fn().mockReturnThis(),
+            leftJoin: jest.fn().mockReturnThis(),
             where: jest.fn().mockReturnThis(),
             andWhere: jest.fn().mockReturnThis(),
             orderBy: jest.fn().mockReturnThis(),
@@ -103,7 +107,28 @@ describe('WordsService', () => {
         {
           provide: HttpService,
           useValue: {
-            get: jest.fn().mockReturnValue(of({ data: [mockWord.details] })),
+            get: jest.fn().mockReturnValue(
+              of({
+                data: [
+                  {
+                    meanings: [
+                      {
+                        definitions: [
+                          {
+                            definition: 'test definition',
+                            example: 'test example',
+                            synonyms: ['synonym1', 'synonym2'],
+                            antonyms: ['antonym1', 'antonym2'],
+                          },
+                        ],
+                        partOfSpeech: 'noun',
+                      },
+                    ],
+                    etymologies: ['test etymology'],
+                  },
+                ],
+              }),
+            ),
           },
         },
         {
@@ -178,8 +203,8 @@ describe('WordsService', () => {
         setHeader: jest.fn(),
       } as any as Response;
 
-      cacheManager.get.mockResolvedValueOnce(null);
-      wordRepository.findOne.mockResolvedValueOnce(null);
+      cacheManager.get.mockResolvedValue(null);
+      (wordRepository.findOne as jest.Mock).mockResolvedValue(null);
 
       const result = await service.findOne('test', 'user1', mockRes);
       expect(result).toEqual(mockWord);
@@ -234,7 +259,7 @@ describe('WordsService', () => {
     });
 
     it('should throw error if word not in favorites', async () => {
-      favoriteRepository.findOne.mockResolvedValueOnce(null);
+      (favoriteRepository.findOne as jest.Mock).mockResolvedValue(null);
       await expect(service.removeFromFavorites('test', 'user1')).rejects.toThrow();
     });
   });

@@ -18,20 +18,20 @@ export class WordsService {
 
   constructor(
     @InjectRepository(Word)
-    private wordsRepository: Repository<Word>,
+    private readonly wordRepository: Repository<Word>,
     @InjectRepository(History)
-    private historyRepository: Repository<History>,
+    private readonly historyRepository: Repository<History>,
     @InjectRepository(Favorite)
-    private favoriteRepository: Repository<Favorite>,
+    private readonly favoriteRepository: Repository<Favorite>,
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
-    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {
-    this.dictionaryApiUrl = this.configService.get<string>('DICTIONARY_API_URL');
+    this.dictionaryApiUrl = this.configService.get<string>('DICTIONARY_API_URL') || 'http://api.dictionaryapi.dev/api/v2';
   }
 
   async findAll(search?: string, cursor?: string, limit = 10) {
-    const query = this.wordsRepository.createQueryBuilder('word');
+    const query = this.wordRepository.createQueryBuilder('word');
 
     if (search) {
       query.where('word.word LIKE :search', { search: `%${search}%` });
@@ -82,7 +82,7 @@ export class WordsService {
     }
 
     // Se não encontrar no cache, busca no banco
-    let wordEntity = await this.wordsRepository.findOne({ where: { word } });
+    let wordEntity = await this.wordRepository.findOne({ where: { word } });
 
     // Se não encontrar no banco, busca na API externa
     if (!wordEntity) {
@@ -92,7 +92,7 @@ export class WordsService {
         );
 
         // Salva no banco
-        wordEntity = await this.wordsRepository.save({
+        wordEntity = await this.wordRepository.save({
           word,
           details: data,
           definition: data[0]?.meanings[0]?.definitions[0]?.definition,
@@ -114,7 +114,7 @@ export class WordsService {
     await this.cacheManager.set(cacheKey, wordEntity);
 
     // Incrementa o contador de buscas
-    await this.wordsRepository.update(wordEntity.id, {
+    await this.wordRepository.update(wordEntity.id, {
       searchCount: wordEntity.searchCount + 1,
     });
 
@@ -227,7 +227,7 @@ export class WordsService {
   }
 
   async addToFavorites(word: string, userId: string) {
-    const wordEntity = await this.wordsRepository.findOne({ 
+    const wordEntity = await this.wordRepository.findOne({ 
       select: ['id'],
       where: { word } 
     });
@@ -252,7 +252,7 @@ export class WordsService {
   }
 
   async removeFromFavorites(word: string, userId: string) {
-    const wordEntity = await this.wordsRepository.findOne({ 
+    const wordEntity = await this.wordRepository.findOne({ 
       select: ['id'],
       where: { word } 
     });

@@ -2,14 +2,20 @@ import { Controller, Get, Post, Delete, Param, Query, UseGuards, Req, Res } from
 import { WordsService } from './words.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
-import { Response } from 'express';
+import { Response, Request } from 'express';
+
+interface RequestWithUser extends Request {
+  user?: {
+    id: string;
+  };
+}
 
 @ApiTags('words')
 @Controller('entries')
 export class WordsController {
   constructor(private readonly wordsService: WordsService) {}
 
-  @Get('en/:word')
+  @Get(':word')
   @ApiOperation({ summary: 'Buscar definição de uma palavra em inglês' })
   @ApiResponse({ 
     status: 200, 
@@ -29,45 +35,27 @@ export class WordsController {
     }
   })
   @ApiResponse({ status: 404, description: 'Palavra não encontrada' })
-  async findOne(@Param('word') word: string) {
-    return this.wordsService.findOne(word);
+  async findOne(
+    @Param('word') word: string,
+    @Req() req: RequestWithUser,
+    @Res() res: Response,
+  ) {
+    if (!req.user || !req.user.id) {
+      throw new Error('Usuário não autenticado');
+    }
+    const result = await this.wordsService.findOne(word, req.user.id, res);
+    return res.json(result);
   }
 
-  @Get('en')
-  @ApiOperation({ summary: 'Listar palavras em inglês' })
-  @ApiQuery({ 
-    name: 'cursor', 
-    required: false, 
-    description: 'Cursor para paginação baseada em cursores' 
-  })
-  @ApiQuery({ 
-    name: 'limit', 
-    required: false, 
-    description: 'Número máximo de resultados por página (padrão: 10)',
-    type: 'number'
-  })
+  @Get()
+  @ApiOperation({ summary: 'Buscar palavras em inglês' })
   @ApiResponse({ 
     status: 200, 
-    description: 'Retorna a lista de palavras paginada',
+    description: 'Retorna uma lista paginada de palavras',
     schema: {
       type: 'object',
       properties: {
-        results: { 
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              word: { type: 'string' },
-              definition: { type: 'string' },
-              example: { type: 'string', nullable: true },
-              etymology: { type: 'string', nullable: true },
-              synonyms: { type: 'array', items: { type: 'string' }, nullable: true },
-              antonyms: { type: 'array', items: { type: 'string' }, nullable: true },
-              partOfSpeech: { type: 'string', nullable: true },
-              searchCount: { type: 'number' }
-            }
-          }
-        },
+        results: { type: 'array', items: { type: 'string' } },
         totalDocs: { type: 'number' },
         previous: { type: 'string', nullable: true },
         next: { type: 'string', nullable: true },
@@ -76,43 +64,34 @@ export class WordsController {
       }
     }
   })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'limit', required: false, type: String })
   async findAll(
-    @Query('cursor') cursor?: string,
-    @Query('limit') limit?: number,
+    @Query('search') search?: string,
+    @Query('limit') limit?: string,
   ) {
-    return this.wordsService.findAll(cursor, limit);
+    return this.wordsService.findAll(search, limit);
   }
 
   @Get('history')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Obter histórico de buscas do usuário' })
-  @ApiQuery({ 
-    name: 'cursor', 
-    required: false, 
-    description: 'Cursor para paginação baseada em cursores' 
-  })
-  @ApiQuery({ 
-    name: 'limit', 
-    required: false, 
-    description: 'Número máximo de resultados por página (padrão: 10)',
-    type: 'number'
-  })
+  @ApiOperation({ summary: 'Buscar histórico de pesquisas do usuário' })
   @ApiResponse({ 
     status: 200, 
-    description: 'Retorna o histórico de buscas do usuário',
+    description: 'Retorna uma lista paginada de palavras pesquisadas',
     schema: {
       type: 'object',
       properties: {
         results: { 
-          type: 'array',
-          items: {
+          type: 'array', 
+          items: { 
             type: 'object',
             properties: {
               word: { type: 'string' },
               added: { type: 'string', format: 'date-time' }
             }
-          }
+          } 
         },
         totalDocs: { type: 'number' },
         previous: { type: 'string', nullable: true },
@@ -122,44 +101,38 @@ export class WordsController {
       }
     }
   })
+  @ApiQuery({ name: 'cursor', required: false, type: String })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
   async getHistory(
-    @Req() req: any,
+    @Req() req: RequestWithUser,
     @Query('cursor') cursor?: string,
     @Query('limit') limit?: number,
   ) {
+    if (!req.user || !req.user.id) {
+      throw new Error('Usuário não autenticado');
+    }
     return this.wordsService.getHistory(req.user.id, cursor, limit);
   }
 
   @Get('favorites')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Obter palavras favoritas do usuário' })
-  @ApiQuery({ 
-    name: 'cursor', 
-    required: false, 
-    description: 'Cursor para paginação baseada em cursores' 
-  })
-  @ApiQuery({ 
-    name: 'limit', 
-    required: false, 
-    description: 'Número máximo de resultados por página (padrão: 10)',
-    type: 'number'
-  })
+  @ApiOperation({ summary: 'Buscar palavras favoritas do usuário' })
   @ApiResponse({ 
     status: 200, 
-    description: 'Retorna as palavras favoritas do usuário',
+    description: 'Retorna uma lista paginada de palavras favoritas',
     schema: {
       type: 'object',
       properties: {
         results: { 
-          type: 'array',
-          items: {
+          type: 'array', 
+          items: { 
             type: 'object',
             properties: {
               word: { type: 'string' },
               added: { type: 'string', format: 'date-time' }
             }
-          }
+          } 
         },
         totalDocs: { type: 'number' },
         previous: { type: 'string', nullable: true },
@@ -169,15 +142,20 @@ export class WordsController {
       }
     }
   })
+  @ApiQuery({ name: 'cursor', required: false, type: String })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
   async getFavorites(
-    @Req() req: any,
+    @Req() req: RequestWithUser,
     @Query('cursor') cursor?: string,
     @Query('limit') limit?: number,
   ) {
+    if (!req.user || !req.user.id) {
+      throw new Error('Usuário não autenticado');
+    }
     return this.wordsService.getFavorites(req.user.id, cursor, limit);
   }
 
-  @Post('en/:word/favorite')
+  @Post(':word/favorites')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Adicionar palavra aos favoritos' })
@@ -187,22 +165,38 @@ export class WordsController {
     schema: {
       type: 'object',
       properties: {
-        id: { type: 'string' },
+        id: { type: 'number' },
         userId: { type: 'string' },
-        wordId: { type: 'string' },
-        favoritedAt: { type: 'string', format: 'date-time' }
+        wordId: { type: 'number' },
+        favoritedAt: { type: 'string', format: 'date-time' },
+        word: { 
+          type: 'object',
+          properties: {
+            id: { type: 'number' },
+            word: { type: 'string' },
+            definition: { type: 'string' },
+            example: { type: 'string', nullable: true },
+            etymology: { type: 'string', nullable: true },
+            synonyms: { type: 'array', items: { type: 'string' }, nullable: true },
+            antonyms: { type: 'array', items: { type: 'string' }, nullable: true },
+            partOfSpeech: { type: 'string', nullable: true },
+            searchCount: { type: 'number' }
+          }
+        }
       }
     }
   })
-  @ApiResponse({ status: 404, description: 'Palavra não encontrada' })
   async addToFavorites(
     @Param('word') word: string,
-    @Req() req: any,
+    @Req() req: RequestWithUser,
   ) {
+    if (!req.user || !req.user.id) {
+      throw new Error('Usuário não autenticado');
+    }
     return this.wordsService.addToFavorites(word, req.user.id);
   }
 
-  @Delete('en/:word/favorite')
+  @Delete(':word/favorites')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Remover palavra dos favoritos' })
@@ -216,11 +210,13 @@ export class WordsController {
       }
     }
   })
-  @ApiResponse({ status: 404, description: 'Palavra não encontrada ou não está nos favoritos' })
   async removeFromFavorites(
     @Param('word') word: string,
-    @Req() req: any,
+    @Req() req: RequestWithUser,
   ) {
+    if (!req.user || !req.user.id) {
+      throw new Error('Usuário não autenticado');
+    }
     return this.wordsService.removeFromFavorites(word, req.user.id);
   }
 } 
