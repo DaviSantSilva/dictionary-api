@@ -2,7 +2,13 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { WordsController } from './words.controller';
 import { WordsService } from './words.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { Response } from 'express';
+import { Response, Request } from 'express';
+
+interface RequestWithUser extends Request {
+  user?: {
+    id: string;
+  };
+}
 
 describe('WordsController', () => {
   let controller: WordsController;
@@ -69,6 +75,39 @@ describe('WordsController', () => {
     removeFromFavorites: jest.fn().mockResolvedValue({ message: 'Word removed from favorites' }),
   };
 
+  const createMockRequest = () => ({
+    user: { id: 'user1' },
+    get: jest.fn(),
+    header: jest.fn(),
+    accepts: jest.fn(),
+    acceptsCharsets: jest.fn(),
+    acceptsEncodings: jest.fn(),
+    acceptsLanguages: jest.fn(),
+    param: jest.fn(),
+    is: jest.fn(),
+    protocol: 'http',
+    secure: false,
+    ip: '127.0.0.1',
+    ips: [],
+    subdomains: [],
+    path: '/',
+    hostname: 'localhost',
+    host: 'localhost:3000',
+    fresh: false,
+    stale: true,
+    xhr: false,
+    body: {},
+    cookies: {},
+    method: 'GET',
+    params: {},
+    query: {},
+    route: {},
+    signedCookies: {},
+    originalUrl: '/',
+    url: '/',
+    baseUrl: '',
+  } as unknown as RequestWithUser);
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [WordsController],
@@ -93,7 +132,7 @@ describe('WordsController', () => {
 
   describe('findAll', () => {
     it('should return paginated words', async () => {
-      const result = await controller.findAll('test', undefined, 10);
+      const result = await controller.findAll('test', '10');
       expect(result).toEqual({
         results: [mockWord.word],
         totalDocs: 1,
@@ -102,15 +141,16 @@ describe('WordsController', () => {
         hasNext: false,
         hasPrev: false,
       });
-      expect(service.findAll).toHaveBeenCalledWith('test', undefined, 10);
+      expect(service.findAll).toHaveBeenCalledWith('test', '10');
     });
   });
 
   describe('findOne', () => {
     it('should return word details', async () => {
-      const mockReq = { user: { id: 'user1' } };
+      const mockReq = createMockRequest();
       const mockRes = {
         json: jest.fn().mockReturnThis(),
+        setHeader: jest.fn(),
       } as any as Response;
 
       await controller.findOne('test', mockReq, mockRes);
@@ -121,7 +161,7 @@ describe('WordsController', () => {
 
   describe('getHistory', () => {
     it('should return user search history', async () => {
-      const mockReq = { user: { id: 'user1' } };
+      const mockReq = createMockRequest();
       const result = await controller.getHistory(mockReq, undefined, 10);
       expect(result).toEqual({
         results: [{ word: mockWord.word, added: mockHistory.searchedAt }],
@@ -137,7 +177,7 @@ describe('WordsController', () => {
 
   describe('getFavorites', () => {
     it('should return user favorites', async () => {
-      const mockReq = { user: { id: 'user1' } };
+      const mockReq = createMockRequest();
       const result = await controller.getFavorites(mockReq, undefined, 10);
       expect(result).toEqual({
         results: [{ word: mockWord.word, added: mockFavorite.favoritedAt }],
@@ -153,7 +193,7 @@ describe('WordsController', () => {
 
   describe('addToFavorites', () => {
     it('should add word to favorites', async () => {
-      const mockReq = { user: { id: 'user1' } };
+      const mockReq = createMockRequest();
       const result = await controller.addToFavorites('test', mockReq);
       expect(result).toEqual(mockFavorite);
       expect(service.addToFavorites).toHaveBeenCalledWith('test', 'user1');
@@ -162,7 +202,7 @@ describe('WordsController', () => {
 
   describe('removeFromFavorites', () => {
     it('should remove word from favorites', async () => {
-      const mockReq = { user: { id: 'user1' } };
+      const mockReq = createMockRequest();
       const result = await controller.removeFromFavorites('test', mockReq);
       expect(result).toEqual({ message: 'Word removed from favorites' });
       expect(service.removeFromFavorites).toHaveBeenCalledWith('test', 'user1');
