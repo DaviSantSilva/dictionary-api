@@ -96,3 +96,147 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 ## License
 
 Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+
+# API de Dicionário
+
+API RESTful para busca de definições de palavras em inglês, com recursos de histórico de buscas e favoritos.
+
+## Funcionalidades
+
+- Busca de definições de palavras em inglês
+- Histórico de buscas por usuário
+- Sistema de favoritos
+- Paginação baseada em cursores
+- Cache com Redis
+- Autenticação JWT
+- Documentação Swagger
+
+## Requisitos
+
+- Node.js 18+
+- PostgreSQL 12+
+- Redis 6+
+
+## Instalação
+
+1. Clone o repositório:
+```bash
+git clone https://github.com/seu-usuario/dictionary-api.git
+cd dictionary-api
+```
+
+2. Instale as dependências:
+```bash
+npm install
+```
+
+3. Configure as variáveis de ambiente:
+```bash
+cp .env.example .env
+```
+
+Edite o arquivo `.env` com suas configurações:
+```env
+# Configurações do Banco de Dados
+DB_HOST=localhost
+DB_PORT=5432
+DB_USERNAME=postgres
+DB_PASSWORD=sua_senha
+DB_DATABASE=dictionary
+
+# Configurações do Redis
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+# Configurações da API
+PORT=3000
+JWT_SECRET=seu_segredo_jwt
+DICTIONARY_API_URL=https://api.dictionaryapi.dev/api/v2/entries/en
+```
+
+4. Execute as migrações:
+```bash
+npm run migration:run
+```
+
+5. Inicie o servidor:
+```bash
+npm run start:dev
+```
+
+## Documentação da API
+
+A documentação completa da API está disponível através do Swagger UI em:
+```
+http://localhost:3000/api
+```
+
+### Endpoints Principais
+
+#### Buscar Palavra
+```
+GET /entries/en/:word
+```
+Retorna a definição de uma palavra em inglês.
+
+#### Listar Palavras
+```
+GET /entries/en?cursor=string&limit=number
+```
+Retorna uma lista paginada de palavras.
+
+#### Histórico de Buscas
+```
+GET /entries/history?cursor=string&limit=number
+```
+Retorna o histórico de buscas do usuário autenticado.
+
+#### Favoritos
+```
+GET /entries/favorites?cursor=string&limit=number
+```
+Retorna as palavras favoritas do usuário autenticado.
+
+```
+POST /entries/en/:word/favorite
+```
+Adiciona uma palavra aos favoritos.
+
+```
+DELETE /entries/en/:word/favorite
+```
+Remove uma palavra dos favoritos.
+
+## Testes
+
+Execute os testes unitários:
+```bash
+npm run test
+```
+
+Execute os testes de integração:
+```bash
+npm run test:e2e
+```
+
+## Performance
+
+A API foi otimizada para melhor performance através de:
+
+- Índices nas tabelas do banco de dados
+- Cache com Redis
+- Seleção específica de campos nas consultas
+- Paginação baseada em cursores
+- Otimização de joins
+
+## Contribuição
+
+1. Faça um fork do projeto
+2. Crie uma branch para sua feature (`git checkout -b feature/nova-feature`)
+3. Commit suas mudanças (`git commit -m 'Adiciona nova feature'`)
+4. Push para a branch (`git push origin feature/nova-feature`)
+5. Abra um Pull Request
+
+## Licença
+
+Este projeto está licenciado sob a licença MIT - veja o arquivo [LICENSE](LICENSE) para mais detalhes.

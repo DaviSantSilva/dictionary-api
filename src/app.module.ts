@@ -9,6 +9,7 @@ import jwtConfig from './config/jwt.config';
 import dictionaryConfig from './config/dictionary.config';
 import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { WordsModule } from './modules/words/words.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { AuthModule } from './modules/auth/auth.module';
     }),
     UsersModule,
     AuthModule,
+    WordsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
