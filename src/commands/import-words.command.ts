@@ -16,6 +16,7 @@ export class ImportWordsCommand extends CommandRunner {
   private readonly logger = new Logger(ImportWordsCommand.name);
   private readonly maxRetries = 3;
   private readonly retryDelay = 1000; // 1 segundo
+  private readonly apiBaseUrl = 'https://api.dictionaryapi.dev/api/v2/entries/en/';
 
   constructor(
     @InjectRepository(Word)
@@ -26,19 +27,15 @@ export class ImportWordsCommand extends CommandRunner {
 
   private async verifyConnection() {
     try {
-      // Verifica se a conexão está ativa
       const isConnected = this.wordRepository.manager.connection.isConnected;
       this.logger.log(`Conexão com o banco está ${isConnected ? 'ativa' : 'inativa'}`);
       
-      // Verifica o banco atual
       const dbResult = await this.wordRepository.query('SELECT current_database() as db');
       this.logger.log(`Banco de dados atual: ${dbResult[0].db}`);
       
-      // Verifica o schema atual
       const schemaResult = await this.wordRepository.query('SELECT current_schema() as schema');
       this.logger.log(`Schema atual: ${schemaResult[0].schema}`);
       
-      // Lista todas as tabelas no schema public
       const tablesResult = await this.wordRepository.query(`
         SELECT table_name, table_schema
         FROM information_schema.tables 
@@ -51,7 +48,6 @@ export class ImportWordsCommand extends CommandRunner {
         this.logger.log(`- ${table.table_name} (schema: ${table.table_schema})`);
       });
       
-      // Verifica se a tabela words existe em qualquer schema (case insensitive)
       const wordsTableResult = await this.wordRepository.query(`
         SELECT table_name, table_schema
         FROM information_schema.tables 
@@ -67,7 +63,6 @@ export class ImportWordsCommand extends CommandRunner {
         this.logger.log('Tabela words não encontrada em nenhum schema');
       }
       
-      // Tenta fazer uma consulta direta na tabela words usando aspas duplas
       try {
         const result = await this.wordRepository.query('SELECT COUNT(*) as count FROM "words"');
         this.logger.log(`Número de registros na tabela words: ${result[0].count}`);
@@ -105,12 +100,45 @@ export class ImportWordsCommand extends CommandRunner {
     }
   }
 
+  private async fetchWordDetails(word: string, retries = this.maxRetries): Promise<any> {
+    try {
+      const response = await axios.get(`${this.apiBaseUrl}${word}`);
+      const data = response.data[0];
+      
+      return {
+        word: word.toLowerCase(),
+        details: data,
+        definition: data.meanings?.[0]?.definitions?.[0]?.definition || 'No definition available',
+        example: data.meanings?.[0]?.definitions?.[0]?.example || null,
+        etymology: data.etymologies?.[0] || null,
+        synonyms: data.meanings?.[0]?.definitions?.[0]?.synonyms || [],
+        antonyms: data.meanings?.[0]?.definitions?.[0]?.antonyms || [],
+        partOfSpeech: data.meanings?.[0]?.partOfSpeech || null,
+        searchCount: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        return null; // Palavra não encontrada
+      }
+      
+      if (retries > 0) {
+        this.logger.warn(`Falha ao buscar detalhes da palavra "${word}". Tentativas restantes: ${retries}`);
+        await setTimeout(this.retryDelay);
+        return this.fetchWordDetails(word, retries - 1);
+      }
+      
+      this.logger.error(`Erro ao buscar detalhes da palavra "${word}": ${error.message}`);
+      return null;
+    }
+  }
+
   async run(): Promise<void> {
     const startTime = Date.now();
     try {
       this.logger.log('Iniciando importação de palavras...');
       
-      // Verifica a conexão antes de começar
       const isConnected = await this.verifyConnection();
       if (!isConnected) {
         throw new Error('Não foi possível estabelecer conexão com o banco de dados');
@@ -123,12 +151,13 @@ export class ImportWordsCommand extends CommandRunner {
       
       this.logger.log(`Encontradas ${words.length} palavras para importar`);
       
-      const batchSize = 1000;
+      const batchSize = 50; // Reduzido para evitar sobrecarga da API
       let successCount = 0;
       let errorCount = 0;
+      let notFoundCount = 0;
       
       const progressBar = new cliProgress.SingleBar({
-        format: '[{bar}] {percentage}% | {value}/{total} palavras | {speed} palavras/s',
+        format: '[{bar}] {percentage}% | {value}/{total} palavras | {speed} palavras/s | Sucesso: {success} | Erro: {error} | Não encontradas: {notFound}',
         barCompleteChar: '\u2588',
         barIncompleteChar: '\u2591',
         hideCursor: true,
@@ -136,6 +165,9 @@ export class ImportWordsCommand extends CommandRunner {
       
       progressBar.start(words.length, 0, {
         speed: 'N/A',
+        success: 0,
+        error: 0,
+        notFound: 0,
       });
       
       for (let i = 0; i < words.length; i += batchSize) {
@@ -143,42 +175,47 @@ export class ImportWordsCommand extends CommandRunner {
         const batchStartTime = Date.now();
         
         try {
-          // Verifica a conexão antes de cada lote
           if (!await this.verifyConnection()) {
             throw new Error('Conexão com o banco foi perdida');
           }
 
-          const wordEntities = batch.map((word: string) => ({
-            word: word.toLowerCase(),
-            definition: 'TBD',
-            searchCount: 0,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          }));
+          const wordDetailsPromises = batch.map(word => this.fetchWordDetails(word));
+          const wordDetailsResults = await Promise.all(wordDetailsPromises);
           
-          await this.wordRepository
-            .createQueryBuilder()
-            .insert()
-            .into('"words"')
-            .values(wordEntities)
-            .onConflict('("word") DO NOTHING')
-            .execute();
-            
-          successCount += batch.length;
+          const validWordDetails = wordDetailsResults.filter(details => details !== null);
+          
+          if (validWordDetails.length > 0) {
+            await this.wordRepository
+              .createQueryBuilder()
+              .insert()
+              .into('"words"')
+              .values(validWordDetails)
+              .onConflict('("word") DO UPDATE SET details = EXCLUDED.details, definition = EXCLUDED.definition, example = EXCLUDED.example, etymology = EXCLUDED.etymology, synonyms = EXCLUDED.synonyms, antonyms = EXCLUDED.antonyms, partOfSpeech = EXCLUDED.partOfSpeech, updatedAt = EXCLUDED.updatedAt')
+              .execute();
+          }
+          
+          successCount += validWordDetails.length;
+          notFoundCount += batch.length - validWordDetails.length;
+          
           const batchEndTime = Date.now();
           const batchDuration = (batchEndTime - batchStartTime) / 1000;
           const wordsPerSecond = Math.round(batch.length / batchDuration);
           
           progressBar.update(i + batch.length, {
             speed: `${wordsPerSecond}`,
+            success: successCount,
+            error: errorCount,
+            notFound: notFoundCount,
           });
           
-          this.logger.log(`Lote ${Math.floor(i / batchSize) + 1} de ${Math.ceil(words.length / batchSize)} importado com sucesso (${wordsPerSecond} palavras/s)`);
+          this.logger.log(`Lote ${Math.floor(i / batchSize) + 1} de ${Math.ceil(words.length / batchSize)} processado (${wordsPerSecond} palavras/s)`);
+          
+          // Aguarda um pouco entre os lotes para não sobrecarregar a API
+          await setTimeout(1000);
         } catch (error) {
           errorCount += batch.length;
-          this.logger.error(`Erro ao importar lote ${Math.floor(i / batchSize) + 1}: ${error.message}`);
+          this.logger.error(`Erro ao processar lote ${Math.floor(i / batchSize) + 1}: ${error.message}`);
           
-          // Se houver erro, tenta reconectar
           await this.verifyConnection();
         }
       }
@@ -191,10 +228,10 @@ export class ImportWordsCommand extends CommandRunner {
       
       this.logger.log('Importação concluída!');
       this.logger.log(`Total de palavras importadas com sucesso: ${successCount}`);
-      this.logger.log(`Total de palavras com erro: ${errorCount}`);
+      this.logger.log(`Total de palavras não encontradas: ${notFoundCount}`);
+      this.logger.log(`Total de erros: ${errorCount}`);
+      this.logger.log(`Velocidade média: ${averageSpeed} palavras/s`);
       this.logger.log(`Tempo total: ${totalDuration.toFixed(2)} segundos`);
-      this.logger.log(`Velocidade média: ${averageSpeed} palavras/segundo`);
-      
     } catch (error) {
       this.logger.error('Erro durante a importação:', error);
       throw error;
